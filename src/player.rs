@@ -1,57 +1,57 @@
-use serde::Serialize;
+use crate::StorageData;
+use serde::{ser::SerializeSeq, Serialize, Serializer};
 use crate::MERKLE_MAP;
+use crate::Player;
+use core::slice::IterMut;
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct PlayerInfo (pub [u64; 2]);
-
-impl PlayerInfo {
-    pub fn new(pid: &[u64;4]) -> Self {
-        PlayerInfo([pid[1], pid[2]])
+// Custom serializer for `[u64; 4]` as an array of strings.
+pub fn bigint_array_serializer<S>(array: &Vec<u64>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let mut seq = serializer.serialize_seq(Some(array.len()))?;
+    for &element in array {
+        seq.serialize_element(&element.to_string())?;
     }
-    pub fn from_raw(a:u64, b:u64) -> Self {
-        PlayerInfo([a, b])
-    }
-    pub fn to_key(&self) -> [u64; 4] {
-        [self.0[0], self.0[1], 0xff00, 0xff01]
-    }
+    seq.end()
 }
 
-#[derive(Debug, Serialize)]
-pub struct Player {
-    #[serde(skip_serializing)]
-    pub player_id: PlayerInfo,
+#[derive(Clone, Serialize)]
+pub struct PlayerData {
+    #[serde(serialize_with = "bigint_array_serializer")]
+    pub inventory: Vec<u64>,
     pub balance: u64,
 }
 
-impl Player {
-    pub fn store(&self) {
-        let mut data = Vec::with_capacity(1);
-        data.push(self.balance);
-        let kvpair = unsafe { &mut MERKLE_MAP };
-        kvpair.set(&self.player_id.to_key(), data.as_slice());
-        zkwasm_rust_sdk::dbg!("end store player\n");
-    }
-
-    pub fn new(player_id: &[u64; 4]) -> Self {
+impl Default for PlayerData {
+    fn default() -> Self {
         Self {
-            player_id: PlayerInfo::new(player_id),
+            inventory: vec![],
             balance: 0,
         }
     }
+}
 
-    pub fn get(pid: &[u64; 4]) -> Option<Self> {
-        let kvpair = unsafe { &mut MERKLE_MAP };
-        let player = PlayerInfo::new(pid); 
-        let data = kvpair.get(&player.to_key());
-        if data.is_empty() {
-            None
-        } else {
-            let balance = data[0].clone();
-            let p = Player {
-                player_id: player.clone(),
-                balance,
-            };
-            Some(p)
+impl StorageData for PlayerData {
+    fn from_data(u64data: &mut IterMut<u64>) -> Self {
+        let objects_size = *u64data.next().unwrap();
+        let mut inventory = Vec::with_capacity(objects_size as usize);
+        for _ in 0..objects_size {
+            inventory.push(*u64data.next().unwrap());
+        }
+        PlayerData {
+            inventory,
+            balance: (*u64data.next().unwrap())
         }
     }
+    fn to_data(&self, data: &mut Vec<u64>) {
+        data.push(self.inventory.len() as u64);
+        for c in self.inventory.iter() {
+            data.push(*c as u64);
+        }
+        data.push(self.balance);
+    }
 }
+
+
+pub type CombatPlayer = Player<PlayerData>;

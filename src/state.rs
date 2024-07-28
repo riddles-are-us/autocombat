@@ -1,6 +1,5 @@
-use crate::settlement::{encode_address, SettleMentInfo, WithdrawInfo};
+use crate::{player::CombatPlayer, settlement::{encode_address, SettleMentInfo, WithdrawInfo}};
 use serde::Serialize;
-use crate::player::{Player, PlayerInfo};
 use crate::game::{Game, CommitmentInfo, Content};
 
 const TIMETICK: u32 = 0;
@@ -14,7 +13,16 @@ pub struct Transaction {
     pub data: [u64; 3],
 }
 
+const ERROR_PLAYER_NOT_FOUND: u32 = 1;
+
 impl Transaction {
+    pub fn decode_error(e: u32) -> &'static str{
+        match e {
+            ERROR_PLAYER_NOT_FOUND => "PlayerNotFound",
+            _ => "Unknown"
+        }
+    }
+
     pub fn decode(params: [u64; 4]) -> Self {
         let command = (params[0] & 0xffffffff) as u32;
         Transaction {
@@ -23,78 +31,53 @@ impl Transaction {
         }
     }
 
-    pub fn deposit(&self) -> bool {
+    pub fn deposit(&self) -> u32 {
+        let pid = [self.data[0], self.data[1]];
+        let mut player = CombatPlayer::get_from_pid(&pid);
         let balance = self.data[3];
-        let player_id = PlayerInfo::from_raw(self.data[0], self.data[1]);
-        let mut player = Player::get(&player_id.to_key());
         match player.as_mut() {
             None => {
-                let player = Player {
-                    player_id,
-                    balance,
-                };
+                let player = CombatPlayer::new_from_pid(pid);
                 player.store();
-                true
             },
             Some(player) => {
-                player.balance += balance;
+                player.data.balance += balance;
                 player.store();
-                true
             }
         }
+        0
     }
 
-    pub fn withdraw(&self, pid: &[u64; 4]) -> bool {
-        let mut player = Player::get(pid);
+    pub fn withdraw(&self, pkey: &[u64; 4]) -> u32 {
+        let mut player = CombatPlayer::get_from_pid(&CombatPlayer::pkey_to_pid(pkey));
         match player.as_mut() {
-            None => false,
+            None => ERROR_PLAYER_NOT_FOUND,
             Some(player) => {
                 let withdraw = WithdrawInfo::new(
                     0,
                     0,
                     0,
-                    [player.balance as u64, 0, 0, 0],
+                    [player.data.balance as u64, 0, 0, 0],
                     encode_address(&self.data.to_vec()),
                     );
                 SettleMentInfo::append_settlement(withdraw);
-                player.balance = 0;
+                player.data.balance = 0;
                 player.store();
-                true
+                0
             }
         }
     }
 
-    pub fn process(&self, pid: &[u64; 4]) -> bool {
+    pub fn process(&self, pid: &[u64; 4]) -> u32 {
         if self.command == TIMETICK {
             unsafe {STATE.counter += 1};
-            true
-        } else if self.command == COMMITCARDS {
-            let state = unsafe {&mut STATE};
-            let game = &mut state.game;
-            let content = Content {
-                player: PlayerInfo::new(pid),
-                commitment: CommitmentInfo::new(self.data[0], self.data[1]),
-                content: None
-            };
-            game.add_commitment(content)
-        } else if self.command == PROVIDECARDS {
-            let state = unsafe {&mut STATE};
-            let game = &mut state.game;
-            let data = self.data[0].to_le_bytes();
-            if game.add_content(PlayerInfo::new(pid), data.to_vec()) {
-                if game.fullfilled() {
-                    game.settle()
-                };
-                true
-            } else {
-                false
-            }
+            0
         } else if self.command == WITHDRAW {
             self.withdraw(pid)
         } else if self.command == DEPOSIT {
             self.deposit()
         } else {
-            false
+            unreachable!()
         }
     }
 }
