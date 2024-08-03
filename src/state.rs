@@ -1,6 +1,8 @@
-use crate::{player::CombatPlayer, settlement::{encode_address, SettleMentInfo, WithdrawInfo}};
+use crate::{game::RoundInfo, player::CombatPlayer, settlement::SettlementInfo};
 use serde::Serialize;
-use crate::game::{Game, CommitmentInfo, Content};
+use zkwasm_rest_abi::WithdrawInfo;
+use zkwasm_rust_sdk::require;
+use crate::game::{Game, CommitmentInfo};
 
 const TIMETICK: u32 = 0;
 const COMMITCARDS: u32 = 1;
@@ -53,15 +55,11 @@ impl Transaction {
         match player.as_mut() {
             None => ERROR_PLAYER_NOT_FOUND,
             Some(player) => {
-                let withdraw = WithdrawInfo::new(
-                    0,
-                    0,
-                    0,
-                    [player.data.balance as u64, 0, 0, 0],
-                    encode_address(&self.data.to_vec()),
-                    );
-                SettleMentInfo::append_settlement(withdraw);
-                player.data.balance = 0;
+                let amount = self.data[0] & 0xffffffff;
+                unsafe {require(player.data.balance >= amount)};
+                let withdrawinfo = WithdrawInfo::new(&self.data);
+                SettlementInfo::append_settlement(withdrawinfo);
+                player.data.balance -= amount;
                 player.store();
                 0
             }
@@ -70,7 +68,9 @@ impl Transaction {
 
     pub fn process(&self, pid: &[u64; 4]) -> u32 {
         if self.command == TIMETICK {
-            unsafe {STATE.counter += 1};
+            let state = unsafe { &mut STATE };
+            state.counter += 1;
+            state.game.settle();
             0
         } else if self.command == WITHDRAW {
             self.withdraw(pid)
@@ -88,11 +88,16 @@ pub struct State {
     game: Game
 }
 
-static mut STATE: State  = State {
+pub static mut STATE: State  = State {
     counter: 0,
     game: Game {
-        game_id: 0,
-        contents: vec![]
+        total_dps: 0,
+        progress: 0,
+        target: 0,
+        last_round_info: RoundInfo {
+            locked_dps: 0,
+            locked_rewards: 0
+        }
     }
 };
 
@@ -102,6 +107,6 @@ impl State {
     pub fn get_state(_pid: Vec<u64>) -> String {
         serde_json::to_string(unsafe {&STATE}).unwrap()
     }
-    pub fn store() {
+    pub fn store(&self) {
     }
 }

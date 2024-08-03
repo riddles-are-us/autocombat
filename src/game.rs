@@ -1,26 +1,16 @@
 use serde::{Serialize, Serializer, ser::SerializeSeq};
+use crate::config::get_monster_health;
+use crate::config::get_monster_rewards;
 
 
 #[derive(Clone)]
 pub struct CommitmentInfo ([u64; 2]);
 
-// Custom serializer for `u64` as a string.
-fn serialize_commitment_info<S>(value: &CommitmentInfo, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut seq = serializer.serialize_seq(Some(value.0.len()))?;
-        for e in value.0.iter() {
-            seq.serialize_element(&e.to_string())?;
-        }
-        seq.end()
-    }
-
 #[derive(Serialize, Clone)]
-pub struct Content {
-    #[serde(serialize_with="serialize_commitment_info")]
-    pub commitment: CommitmentInfo,
-    pub content: Option<Vec<u8>> // card contents
+pub struct Monster {
+    pub health: u64,
+    pub rewards: u64,
+    pub buf: Vec<u8>
 }
 
 impl CommitmentInfo {
@@ -30,13 +20,29 @@ impl CommitmentInfo {
 }
 
 #[derive(Serialize, Clone)]
+pub struct RoundInfo {
+    pub locked_dps: u64,
+    pub locked_rewards: u64,
+}
+
+#[derive(Serialize, Clone)]
 pub struct Game {
-    pub game_id: u64,
-    pub contents: Vec<Content>,
+    pub total_dps: u64,
+    pub progress: u64,
+    pub target: usize, // the target monster id
+    pub last_round_info: RoundInfo,
 }
 
 impl Game {
     pub fn settle(&mut self) {
-        todo!()
+        self.progress += self.total_dps;
+        if self.progress >= get_monster_health(self.target as usize) {
+            self.last_round_info = RoundInfo {
+                locked_dps: self.total_dps,
+                locked_rewards: get_monster_rewards(self.target as usize)
+            };
+            self.progress = 0;
+            self.target += 1;
+        }
     }
 }
