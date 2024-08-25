@@ -1,6 +1,4 @@
-use zkwasm_rest_abi::{WithdrawInfo, MERKLE_MAP};
-
-use crate::state::STATE;
+use zkwasm_rest_abi::WithdrawInfo;
 
 pub struct SettlementInfo(Vec<WithdrawInfo>);
 pub static mut SETTLEMENT: SettlementInfo = SettlementInfo(vec![]);

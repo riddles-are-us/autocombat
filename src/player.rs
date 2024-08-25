@@ -1,8 +1,5 @@
-use crate::config::get_monster_health;
-use crate::config::get_monster_rewards;
 use crate::StorageData;
 use serde::{ser::SerializeSeq, Serialize, Serializer};
-use crate::MERKLE_MAP;
 use crate::Player;
 use core::slice::IterMut;
 
@@ -22,24 +19,16 @@ where
 pub struct PlayerData {
     #[serde(serialize_with = "bigint_array_serializer")]
     pub inventory: Vec<u64>,
-    pub energe: u64,
-    pub target: u64,
-    pub remain: u64,
-    pub dps: u64,
-    pub time_stamp: u64,
     pub balance: u64,
+    pub placed: u64,
 }
 
 impl Default for PlayerData {
     fn default() -> Self {
         Self {
             inventory: vec![],
-            energe: 0,
-            target: 0,
-            remain: 0,
-            dps: 0,
-            time_stamp: 0,
             balance: 0,
+            placed: 0,
         }
     }
 }
@@ -53,12 +42,8 @@ impl StorageData for PlayerData {
         }
         PlayerData {
             inventory,
-            energe: *u64data.next().unwrap(),
-            target: *u64data.next().unwrap(),
-            remain: *u64data.next().unwrap(),
-            dps: *u64data.next().unwrap(),
-            time_stamp: (*u64data.next().unwrap()),
-            balance: (*u64data.next().unwrap())
+            balance: (*u64data.next().unwrap()),
+            placed: (*u64data.next().unwrap())
         }
     }
     fn to_data(&self, data: &mut Vec<u64>) {
@@ -66,28 +51,21 @@ impl StorageData for PlayerData {
         for c in self.inventory.iter() {
             data.push(*c as u64);
         }
-        data.push(self.energe);
-        data.push(self.target);
-        data.push(self.remain);
-        data.push(self.dps);
-        data.push(self.time_stamp);
         data.push(self.balance);
+        data.push(self.placed);
     }
 }
 
-trait SettleDps {
-    fn settle_dps(&mut self, time: u64);
+pub trait Settle {
+    fn settle_rewards(&mut self, rewards: u64);
 }
 
 
 pub type CombatPlayer = Player<PlayerData>;
 
-impl SettleDps for CombatPlayer {
-    fn settle_dps(&mut self, time: u64) {
-        let dmg = (time - self.data.time_stamp) * self.data.dps + self.data.remain;
-        let total = dmg / get_monster_health(self.data.target as usize);
-        self.data.remain = dmg - total * self.data.target;
-        self.data.energe += total * get_monster_rewards(self.data.target as usize);
-        self.data.time_stamp = time;
+impl Settle for CombatPlayer {
+    fn settle_rewards(&mut self, rewards: u64) {
+        self.data.balance += rewards;
+        self.store();
     }
 }

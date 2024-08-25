@@ -13,27 +13,12 @@ function createCommand(nonce: bigint, command: bigint, feature: bigint) {
 
 let account = "1234";
 
-//const rpc = new ZKWasmAppRpc("http://localhost:3000");
-const rpc = new ZKWasmAppRpc("http://114.119.187.224:8085");
+const rpc = new ZKWasmAppRpc("http://localhost:3000");
 
 async function main() {
-  //sending_transaction([0n,0n,0n,0n], "1234");
-  let towerId = 0n;
-  let x = 0n;
-  let y = 0n;
   let state:any = await rpc.queryState(account);
   let data = JSON.parse(state.data);
-
-  console.log("player info:");
-  console.log(data.player);
-
-  console.log("monsters info:");
-  console.log(data.global.monsters);
-
-
-  console.log("towers info:");
-  console.log(data.global.towers);
-
+  console.log(data);
   let config = await rpc.query_config();
   console.log("config", config);
 }
