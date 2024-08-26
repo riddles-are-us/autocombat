@@ -31,10 +31,12 @@ impl Game {
     pub fn settle(&mut self, info: u64) {
         let result = [(info % 6) as u32, ((info >> 8) % 6) as u32]; // (player, server)'s number;
         self.result = Some (result);
+        let mut player = CombatPlayer::get_from_pid(&self.player).unwrap();
         if result[0] >= result[1] {
-            let mut player = CombatPlayer::get_from_pid(&self.player).unwrap();
             player.settle_rewards(self.bet);
-            player.store();
         }
+        player.data.previous = info;
+        player.data.placed = 0; // last game has been settled
+        player.store();
     }
 }

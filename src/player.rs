@@ -21,6 +21,7 @@ pub struct PlayerData {
     pub inventory: Vec<u64>,
     pub balance: u64,
     pub placed: u64,
+    pub previous: u64,
 }
 
 impl Default for PlayerData {
@@ -29,6 +30,7 @@ impl Default for PlayerData {
             inventory: vec![],
             balance: 0,
             placed: 0,
+            previous: 0,
         }
     }
 }
@@ -43,7 +45,8 @@ impl StorageData for PlayerData {
         PlayerData {
             inventory,
             balance: (*u64data.next().unwrap()),
-            placed: (*u64data.next().unwrap())
+            placed: (*u64data.next().unwrap()),
+            previous: (*u64data.next().unwrap())
         }
     }
     fn to_data(&self, data: &mut Vec<u64>) {
@@ -53,6 +56,7 @@ impl StorageData for PlayerData {
         }
         data.push(self.balance);
         data.push(self.placed);
+        data.push(self.previous);
     }
 }
 

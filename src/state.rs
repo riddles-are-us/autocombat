@@ -1,5 +1,8 @@
 use crate::{player::CombatPlayer, settlement::SettlementInfo};
+use lazy_static::lazy_static;
 use serde::Serialize;
+use sha2::Sha256;
+use sha2::Digest;
 use zkwasm_rest_abi::WithdrawInfo;
 use zkwasm_rust_sdk::require;
 use crate::game::Game;
@@ -17,6 +20,11 @@ pub struct Transaction {
 const ERROR_PLAYER_NOT_FOUND: u32 = 1;
 const PLAYER_IN_GAME: u32 = 2;
 const INVALID_BET: u32 = 3;
+
+
+lazy_static!(
+    static ref HASHER:Sha256 = Sha256::new();
+);
 
 impl Transaction {
     pub fn decode_error(e: u32) -> &'static str{
@@ -38,8 +46,10 @@ impl Transaction {
 
     pub fn deposit(&self) -> u32 {
         let pid = [self.data[0], self.data[1]];
+        zkwasm_rust_sdk::dbg!("deposit pre\n");
         let mut player = CombatPlayer::get_from_pid(&pid);
-        let balance = self.data[3];
+        zkwasm_rust_sdk::dbg!("deposit\n");
+        let balance = self.data[2];
         match player.as_mut() {
             None => {
                 let player = CombatPlayer::new_from_pid(pid);
@@ -94,6 +104,13 @@ impl Transaction {
             let state = unsafe { &mut STATE };
             state.counter += 1;
             let rand = self.data[0];
+            zkwasm_rust_sdk::dbg!("new rand is {:?}\n", {self.data[1]});
+            zkwasm_rust_sdk::dbg!("new rand bytes {:?}\n", {rand.to_le_bytes()});
+            let mut hasher = HASHER.clone();
+            hasher.update(rand.to_be_bytes());
+            let v = hasher.finalize();
+            let checkseed = u64::from_le_bytes(v[0..8].try_into().unwrap());
+            zkwasm_rust_sdk::dbg!("v is {:?}\n", checkseed );
             state.rand_commitment = self.data[1];
             unsafe { STATE.settle(rand) };
             0
@@ -124,12 +141,24 @@ pub static mut STATE: State  = State {
     games: vec![],
 };
 
+#[derive(Serialize)]
+pub struct UserState<'a> {
+    player: Option<CombatPlayer>,
+    global: &'a State,
+}
+
+
+
 impl State {
     pub fn initialize() {
     }
 
     pub fn preempt() -> bool {
         return false;
+    }
+
+    pub fn rand_seed() -> u64 {
+        unsafe { STATE.rand_commitment }
     }
 
     pub fn settle(&mut self, rand: u64) {
@@ -145,8 +174,16 @@ impl State {
     }
 
 
-    pub fn get_state(_pid: Vec<u64>) -> String {
-        serde_json::to_string(unsafe {&STATE}).unwrap()
+    pub fn get_state(pkey: Vec<u64>) -> String {
+        let state = unsafe { &STATE };
+        let player = CombatPlayer::get_from_pid(&CombatPlayer::pkey_to_pid(&pkey.try_into().unwrap()));
+        serde_json::to_string(
+            &(UserState {
+                player,
+                global: &state,
+            }),
+        )
+        .unwrap()
     }
 
     pub fn store(&self) {
