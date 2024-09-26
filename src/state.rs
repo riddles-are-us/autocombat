@@ -91,7 +91,9 @@ impl Transaction {
                 } else {
                     let game = Game::new(&player, place, rand);
                     unsafe { STATE.new_game(game) };
+                    zkwasm_rust_sdk::dbg!("player placed a bet {}\n", place);
                     player.data.placed = place;
+                    player.data.balance -= place;
                     player.store();
                     return 0
                 }
@@ -107,10 +109,13 @@ impl Transaction {
             zkwasm_rust_sdk::dbg!("new rand is {:?}\n", {self.data[1]});
             zkwasm_rust_sdk::dbg!("new rand bytes {:?}\n", {rand.to_le_bytes()});
             let mut hasher = HASHER.clone();
-            hasher.update(rand.to_be_bytes());
+            hasher.update(rand.to_le_bytes());
             let v = hasher.finalize();
-            let checkseed = u64::from_le_bytes(v[0..8].try_into().unwrap());
+            let checkseed = u64::from_be_bytes(v[24..32].try_into().unwrap());
             zkwasm_rust_sdk::dbg!("v is {:?}\n", checkseed );
+            if state.rand_commitment !=0 {
+                unsafe { zkwasm_rust_sdk::require(state.rand_commitment == checkseed) };
+            }
             state.rand_commitment = self.data[1];
             unsafe { STATE.settle(rand) };
             0
@@ -153,8 +158,18 @@ impl State {
     pub fn initialize() {
     }
 
+    pub fn snapshot() -> String {
+        let state = unsafe { &STATE };
+        serde_json::to_string(&state).unwrap()
+    }
+
     pub fn preempt() -> bool {
-        return false;
+        let state = unsafe { &STATE };
+        if state.counter % 10 == 0 {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     pub fn rand_seed() -> u64 {
@@ -175,15 +190,8 @@ impl State {
 
 
     pub fn get_state(pkey: Vec<u64>) -> String {
-        let state = unsafe { &STATE };
         let player = CombatPlayer::get_from_pid(&CombatPlayer::pkey_to_pid(&pkey.try_into().unwrap()));
-        serde_json::to_string(
-            &(UserState {
-                player,
-                global: &state,
-            }),
-        )
-        .unwrap()
+        serde_json::to_string(&player).unwrap()
     }
 
     pub fn store(&self) {
