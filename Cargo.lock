@@ -334,7 +334,7 @@ dependencies = [
 [[package]]
 name = "zkwasm-rest-abi"
 version = "0.1.0"
-source = "git+https://github.com/DelphinusLab/zkwasm-typescript-mini-server#e5e6c18e72a988cf36d46bcefb99598621828e1b"
+source = "git+https://github.com/DelphinusLab/zkwasm-typescript-mini-server#f443b5dd56aeaba4c67c74890caefc4bc136261f"
 dependencies = [
  "derive_builder",
  "lazy_static",

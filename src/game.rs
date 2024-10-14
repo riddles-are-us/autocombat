@@ -29,13 +29,27 @@ impl Game {
         }
     }
     pub fn settle(&mut self, info: u64) {
-        let result = [(info % 6) as u32, ((info >> 8) % 6) as u32]; // (player, server)'s number;
-        self.result = Some (result);
         let mut player = CombatPlayer::get_from_pid(&self.player).unwrap();
-        if result[0] >= result[1] {
-            player.settle_rewards(self.bet);
+        let command = player.data.previous >> 32;
+        if command == 1 { // FIGHT
+            if player.data.placed == 0 {
+                let damage = player.data.previous & 0xff;
+                if player.data.power > damage {
+                    player.data.power -= damage;
+                } else {
+                    player.data.power = 0;
+                }
+            } else {
+                player.data.balance = player.data.balance / 2;
+            }
+        } else {
+            if player.data.placed == 0 {
+                player.data.balance += (player.data.previous >> 8) & 0xff;
+            } else {
+                player.data.power += (player.data.previous) & 0xff;
+            }
         }
-        player.data.previous = info;
+        player.data.previous = info & 0x1ffffffff;
         player.data.placed = 0; // last game has been settled
         player.store();
     }

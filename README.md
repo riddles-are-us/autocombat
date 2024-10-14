@@ -1,4 +1,4 @@
-# Introductin
+# Introduction
 This is a generic template about creating a trustless auto card game that runs in the ZKWASM VM and performs settlement onchain. In general, implementing an PVE game between players and the server needs some special design to make sure the game is fair. We abstract these special stages into 4 stages
 
 0. Admin generates a random seed and commit the seed into the state by commitment = hash(seed)
