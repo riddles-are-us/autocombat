@@ -1,11 +1,14 @@
 # Introduction
-This is a generic template about creating a trustless auto card game that runs in the ZKWASM VM and performs settlement onchain. In general, implementing an PVE game between players and the server needs some special design to make sure the game is fair. We abstract these special stages into 4 stages
 
-0. Admin generates a random seed and commit the seed into the state by commitment = hash(seed)
-1. Player sign the commitment of the random seed and provide a signature SR
-2. Admin reveal the seed by providing the seed to the server
-3. Server check the seed has correct hash by hash(seed) = commitment
-4. A random number is then generated for the Player by seed xor SR
+This is a generic template for creating a trustless auto card game that runs in the ZKWASM VM and performs on-chain settlement. To ensure fairness in a PVE game between players and the server, some special design steps are needed. These steps have been abstracted into five key stages:
+
+1. **Seed Commitment**: The admin generates a random seed and commits to it by storing its hash, `commitment = hash(seed)`, in the game state.
+2. **Player Signature**: The player signs the commitment of the random seed and provides their signature (`SR`).
+3. **Seed Revelation**: The admin reveals the seed by submitting it to the server.
+4. **Verification**: The server verifies that the revealed seed is correct by checking that `hash(seed) = commitment`.
+5. **Random Number Generation**: Then, a random number for the player is generated using the formula `seed xor SR`.
+
+This process ensures the integrity of the game's randomness while maintaining fairness through verifiable inputs from both the admin and the player.
 
 ## Install ZKWASM-MINI-ROLLUP
 
@@ -56,9 +59,9 @@ run:
 ```
 make
 ```
-
-3. Specify your deploy environment by filling the ```.env``` file with empty content
-```
+3. Specify Your Deployment Environment
+   
+Fill the .env file with the following content:
 #IMAGE="784A58A49E44A85B1C508BC796166CBA"
 #DEPLOY=TRUE
 #USER_PRIVATE_ACCOUNT="..."
@@ -66,8 +69,22 @@ make
 #SETTLEMENT_CONTRACT_ADDRESS="..."
 #RPC_PROVIDER="..."
 #SETTLER_PRIVATE_ACCOUNT="..."
-```
-where IMAGE is the image hash in the ZKWASM explorer
+
+Here’s what each variable means:
+
+IMAGE: This is the hash of the image from the ZKWASM explorer, which corresponds to the compiled game code or application. Replace the placeholder with the actual hash from the ZKWASM explorer.
+
+DEPLOY: Setting this to TRUE indicates that the deployment process should be executed when the script is run.
+
+USER_PRIVATE_ACCOUNT: This is the private key of the user or player account. Replace this with the appropriate value to authorize the user’s participation in the game or deployment.
+
+USER_ADDRESS: The public address associated with the user's private account. This is needed for identifying the user on the blockchain.
+
+SETTLEMENT_CONTRACT_ADDRESS: This is the address of the smart contract handling the game's settlement on-chain. You’ll replace this with the actual contract address where the game’s final state will be verified and settled.
+
+RPC_PROVIDER: The Remote Procedure Call (RPC) provider's URL. This is used to interact with the blockchain network where the game is deployed.
+
+SETTLER_PRIVATE_ACCOUNT: The private key of the settler account, responsible for submitting and verifying game settlements on-chain.
 
 4. Run the RPC server
 ```
